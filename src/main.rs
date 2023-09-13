@@ -1,12 +1,13 @@
 use std::net::{TcpListener, TcpStream};
 use std::io::{Read, Write, self};
-use std::{env, thread};
+use std::env;
 use std::str::from_utf8;
 
 enum EnvArg
     {
         Client,
         Server,
+        Fail,
     }
 impl EnvArg 
     {
@@ -17,11 +18,10 @@ impl EnvArg
                         Ok(mut socket) =>
                             {
                                 println!("Connected");
-                                let socket_clone = socket.try_clone().expect("Cloning Failed");
-                                thread::spawn(move || {Self::c_send(&socket_clone)});
                                 let stay = true;
                                 while stay
                                     {
+                                        socket.write(take_string().as_bytes()).unwrap();
                                         let mut data = [0 as u8; 1024];
                                         match socket.read(&mut data)
                                             {
@@ -48,19 +48,11 @@ impl EnvArg
                     }
                 return true;
             }
-        fn c_send(mut socket:&TcpStream)
-            {
-                let stay = true;
-                while stay
-                    {
-                        socket.write(take_string().as_bytes()).unwrap();
-                    }
-            }
 
         fn s_connect() -> bool
             {
                 let socket = TcpListener::bind("localhost:2121");
-                for stream in socket.expect("Panic").incoming()
+                for stream in socket.expect("Can't Check Connections").incoming()
                     {
                         match stream
                             {
@@ -123,7 +115,7 @@ fn take_arg() -> EnvArg
                     },
                 _ => println!("Only one argument is allowed"),
             }
-        panic!();
+        return EnvArg::Fail;
     }
 
 fn take_string() -> String
@@ -138,7 +130,7 @@ fn client()
         println!("Client");
         if EnvArg::c_connect() != true
             {
-                panic!();
+                println!("Client Exit");
             }
     }
 fn server()
@@ -146,7 +138,7 @@ fn server()
         println!("Server");
         if EnvArg::s_connect() != true
             {
-                panic!();
+                println!("Server Exit");
             }
     }
 
@@ -156,6 +148,7 @@ fn main()
         match take_arg() 
             {
                 EnvArg::Client => client(),
-                EnvArg::Server => server()
+                EnvArg::Server => server(),
+                EnvArg::Fail => return
             }
     }
