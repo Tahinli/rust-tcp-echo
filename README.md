@@ -1,2 +1,2 @@
 # rust-tcp
-TCP Server and Client in Rust
+TCP Echo Server and Client in Rust
