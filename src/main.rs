@@ -1,6 +1,6 @@
 use std::net::{TcpListener, TcpStream};
-use std::io::{Read, Write};
-use std::env;
+use std::io::{Read, Write, self};
+use std::{env, thread};
 use std::str::from_utf8;
 
 enum EnvArg
@@ -17,18 +17,26 @@ impl EnvArg
                         Ok(mut socket) =>
                             {
                                 println!("Connected");
-                                socket.write(b"Hello").unwrap();
-                                let mut data = [0 as u8; 1024];
-                                match socket.read(&mut data)
+                                let socket_clone = socket.try_clone().expect("Cloning Failed");
+                                thread::spawn(move || {Self::c_send(&socket_clone)});
+                                let stay = true;
+                                while stay
                                     {
-                                        Ok(_) => 
+                                        let mut data = [0 as u8; 1024];
+                                        match socket.read(&mut data)
                                             {
-                                                println!("{}", from_utf8(&data).unwrap());
-                                            }
-                                        Err(e) =>
-                                            {
-                                                println!("Failed to receive data: {}", e);
-                                                return false;
+                                                Ok(_) => 
+                                                    {
+                                                        if data[0] != 0
+                                                            {
+                                                                println!("{}", from_utf8(&data).unwrap());
+                                                            }
+                                                    }
+                                                Err(e) =>
+                                                    {
+                                                        println!("Failed to receive data: {}", e);
+                                                        return false;
+                                                    }
                                             }
                                     }
                             }
@@ -40,6 +48,14 @@ impl EnvArg
                     }
                 return true;
             }
+        fn c_send(mut socket:&TcpStream)
+            {
+                let stay = true;
+                while stay
+                    {
+                        socket.write(take_string().as_bytes()).unwrap();
+                    }
+            }
 
         fn s_connect() -> bool
             {
@@ -50,22 +66,26 @@ impl EnvArg
                             {
                                 Ok(mut stream) =>
                                     {
-                                        let mut data = [0 as u8; 1024];
-                                        match stream.read(&mut data)
+                                        let stay = true;
+                                        while stay
                                             {
-                                                Ok(a) => 
+                                                let mut data = [0 as u8; 1024];
+                                                match stream.read(&mut data)
                                                     {
-                                                        if a == 0
+                                                        Ok(a) => 
                                                             {
-                                                                println!("Connection Closed");
+                                                                if a == 0
+                                                                    {
+                                                                        println!("Connection Closed");
+                                                                        return false;
+                                                                    }
+                                                                println!("{}", stream.write(&data).unwrap());
+                                                            }
+                                                        Err(e) =>
+                                                            {
+                                                                println!("Failed to Read: {}", e);
                                                                 return false;
                                                             }
-                                                        println!("{}", stream.write(&data).unwrap());
-                                                    }
-                                                Err(e) =>
-                                                    {
-                                                        println!("Failed to Read: {}", e);
-                                                        return false;
                                                     }
                                             }
                                     }
@@ -104,6 +124,13 @@ fn take_arg() -> EnvArg
                 _ => println!("Only one argument is allowed"),
             }
         panic!();
+    }
+
+fn take_string() -> String
+    {
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).expect("Failed to Read from Console");
+        input
     }
 
 fn client() 
